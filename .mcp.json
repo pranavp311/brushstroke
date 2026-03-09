@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "devswarm": {
+      "command": "/Users/pranavp/projects/codedb/zig-out/bin/devswarm",
+      "args": []
+    },
+    "frontend-mcp": {
+      "command": "node",
+      "args": ["/Users/pranavp/projects/frontendmcp/dist/index.js"]
+    }
+  }
+}
