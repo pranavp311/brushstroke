@@ -2,3 +2,18 @@ node_modules/
 dist/
 *.tsbuildinfo
 .env
+.env.local
+
+# Local scratch / working notes
+CLAUDE.md
+IMPLEMENTATION_PLAN.md
+CRITICAL_REVIEW_MATRIX.md
+CHANGES_SUMMARY.md
+ERROR_REPORT.md
+*_REPORT.md
+*_SUMMARY.md
+test-output/
+.DS_Store
+
+# Local MCP wiring (machine-specific absolute paths)
+.mcp.json

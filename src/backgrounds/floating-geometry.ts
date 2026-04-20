@@ -101,3 +101,80 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });`;
 }
+
+// Scene element version - for composition into existing scenes
+export function floatingGeometrySceneElement(colors: ColorScheme, count: number, interactive: boolean): string {
+  return `
+// Floating Geometry Background (Scene Element)
+const bgGeometries = [
+  new THREE.IcosahedronGeometry(1, 0),
+  new THREE.OctahedronGeometry(1, 0),
+  new THREE.TetrahedronGeometry(1, 0),
+  new THREE.BoxGeometry(1.2, 1.2, 1.2),
+  new THREE.TorusGeometry(0.8, 0.3, 8, 16),
+];
+
+const bgPalette = [
+  ${hexToThreeColor(colors.primary)},
+  ${hexToThreeColor(colors.secondary)},
+  ${hexToThreeColor(colors.accent)},
+];
+
+const bgMeshes = [];
+const bgGroup = new THREE.Group();
+bgGroup.position.z = -100;
+
+for (let i = 0; i < ${count}; i++) {
+  const geo = bgGeometries[Math.floor(Math.random() * bgGeometries.length)];
+  const mat = new THREE.MeshStandardMaterial({
+    color: bgPalette[Math.floor(Math.random() * bgPalette.length)],
+    metalness: 0.3,
+    roughness: 0.7,
+    flatShading: true,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  const scale = Math.random() * 1.5 + 0.5;
+  mesh.scale.setScalar(scale);
+  mesh.position.set(
+    (Math.random() - 0.5) * 200,
+    (Math.random() - 0.5) * 200,
+    (Math.random() - 0.5) * 50
+  );
+  mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+  mesh.userData.speed = {
+    rotX: (Math.random() - 0.5) * 0.01,
+    rotY: (Math.random() - 0.5) * 0.01,
+    floatSpeed: Math.random() * 0.5 + 0.2,
+    floatOffset: Math.random() * Math.PI * 2,
+  };
+  bgGroup.add(mesh);
+  bgMeshes.push(mesh);
+}
+
+scene.add(bgGroup);
+
+${interactive ? `
+// Mouse interaction for background
+const bgMouse = new THREE.Vector2(0, 0);
+document.addEventListener('mousemove', (e) => {
+  bgMouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  bgMouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+});` : ""}
+
+// Background animation - will be called from main animate loop
+function updateBackground(t) {
+  bgMeshes.forEach((m) => {
+    m.rotation.x += m.userData.speed.rotX;
+    m.rotation.y += m.userData.speed.rotY;
+    m.position.y += Math.sin(t * m.userData.speed.floatSpeed + m.userData.speed.floatOffset) * 0.005;
+  });
+
+  ${interactive ? `
+  // Subtle parallax
+  bgGroup.position.x += (bgMouse.x * 5 - bgGroup.position.x) * 0.02;
+  bgGroup.position.y += (bgMouse.y * 5 - bgGroup.position.y) * 0.02;` : ""}
+}
+
+// Make update function available globally for the animation loop
+window.updateBackgroundFloatingGeometry = updateBackground;`;
+}

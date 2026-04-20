@@ -1,13 +1,14 @@
 import { ColorScheme, DEFAULT_SCHEME } from "../utils/color-utils.js";
 import { standaloneHtml, threeImportMap } from "../utils/html-template.js";
-import { particlesBackground } from "./particles.js";
-import { gradientMeshBackground } from "./gradient-mesh.js";
-import { noiseTerrainBackground } from "./noise-terrain.js";
-import { floatingGeometryBackground } from "./floating-geometry.js";
-import { waveBackground } from "./wave.js";
-import { starfieldBackground } from "./starfield.js";
-import { auroraBackground } from "./aurora.js";
-import { matrixRainBackground } from "./matrix-rain.js";
+import { particlesBackground, particlesSceneElement } from "./particles.js";
+import { gradientMeshBackground, gradientMeshSceneElement } from "./gradient-mesh.js";
+import { noiseTerrainBackground, noiseTerrainSceneElement } from "./noise-terrain.js";
+import { floatingGeometryBackground, floatingGeometrySceneElement } from "./floating-geometry.js";
+import { waveBackground, waveSceneElement } from "./wave.js";
+import { starfieldBackground, starfieldSceneElement } from "./starfield.js";
+import { auroraBackground, auroraSceneElement } from "./aurora.js";
+import { matrixRainBackground, matrixRainSceneElement } from "./matrix-rain.js";
+import { fluidSimBackground, fluidSimSceneElement } from "./fluid-sim.js";
 
 export type BackgroundPreset =
   | "particles"
@@ -17,10 +18,11 @@ export type BackgroundPreset =
   | "wave"
   | "starfield"
   | "aurora"
-  | "matrix_rain";
+  | "matrix_rain"
+  | "fluid_sim";
 
 export type Quality = "low" | "medium" | "high";
-export type BackgroundOutputFormat = "standalone_html" | "module_js" | "component_react";
+export type BackgroundOutputFormat = "standalone_html" | "module_js" | "component_react" | "scene_element";
 
 const QUALITY_MAP: Record<Quality, { count: number; segments: number }> = {
   low: { count: 500, segments: 32 },
@@ -28,7 +30,9 @@ const QUALITY_MAP: Record<Quality, { count: number; segments: number }> = {
   high: { count: 10000, segments: 128 },
 };
 
-const generators: Record<BackgroundPreset, (colors: ColorScheme, countOrSegs: number, interactive: boolean) => string> = {
+const generators: Record<Exclude<BackgroundPreset, "fluid_sim">, (colors: ColorScheme, countOrSegs: number, interactive: boolean) => string> & {
+  fluid_sim: (colors: ColorScheme, options?: Partial<import("./fluid-sim.js").FluidSimOptions>) => string;
+} = {
   particles: particlesBackground,
   gradient_mesh: gradientMeshBackground,
   noise_terrain: noiseTerrainBackground,
@@ -37,7 +41,22 @@ const generators: Record<BackgroundPreset, (colors: ColorScheme, countOrSegs: nu
   starfield: starfieldBackground,
   aurora: auroraBackground,
   matrix_rain: matrixRainBackground,
-};
+  fluid_sim: fluidSimBackground,
+} as any;
+
+const sceneElementGenerators: Record<Exclude<BackgroundPreset, "fluid_sim">, (colors: ColorScheme, countOrSegs: number, interactive: boolean) => string> & {
+  fluid_sim: (colors: ColorScheme, options?: Partial<import("./fluid-sim.js").FluidSimOptions>) => string;
+} = {
+  particles: particlesSceneElement,
+  gradient_mesh: gradientMeshSceneElement,
+  noise_terrain: noiseTerrainSceneElement,
+  floating_geometry: floatingGeometrySceneElement,
+  wave: waveSceneElement,
+  starfield: starfieldSceneElement,
+  aurora: auroraSceneElement,
+  matrix_rain: matrixRainSceneElement,
+  fluid_sim: fluidSimSceneElement,
+} as any;
 
 export function generateBackground(
   preset: BackgroundPreset,
@@ -48,13 +67,24 @@ export function generateBackground(
 ): string {
   const scheme: ColorScheme = { ...DEFAULT_SCHEME, ...colors };
   const q = QUALITY_MAP[quality];
-  const gen = generators[preset];
-  if (!gen) throw new Error(`Unknown preset: ${preset}`);
 
   // Use count for particle-like presets, segments for mesh-like presets
+  // Fluid sim uses resolution as param
   const param = ["particles", "floating_geometry", "starfield", "matrix_rain"].includes(preset)
     ? q.count
+    : preset === "fluid_sim"
+    ? q.segments * 2  // Higher resolution for fluid sim
     : q.segments;
+
+  // scene_element format - return just the mesh setup code
+  if (outputFormat === "scene_element") {
+    const gen = sceneElementGenerators[preset];
+    if (!gen) throw new Error(`No scene_element generator for preset: ${preset}`);
+    return gen(scheme, param, interactive);
+  }
+
+  const gen = generators[preset];
+  if (!gen) throw new Error(`Unknown preset: ${preset}`);
 
   const moduleCode = gen(scheme, param, interactive);
 

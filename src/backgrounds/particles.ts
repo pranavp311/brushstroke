@@ -95,3 +95,80 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });`;
 }
+
+// Scene element version - for composition into existing scenes
+export function particlesSceneElement(colors: ColorScheme, count: number, interactive: boolean): string {
+  return `
+// Particles Background (Scene Element)
+const bgParticleCount = ${count};
+const bgPositions = new Float32Array(bgParticleCount * 3);
+const bgColors = new Float32Array(bgParticleCount * 3);
+const bgSizes = new Float32Array(bgParticleCount);
+
+const bgPalette = [
+  ${hexToThreeColor(colors.primary)},
+  ${hexToThreeColor(colors.secondary)},
+  ${hexToThreeColor(colors.accent)},
+];
+
+for (let i = 0; i < bgParticleCount; i++) {
+  bgPositions[i * 3] = (Math.random() - 0.5) * 200;
+  bgPositions[i * 3 + 1] = (Math.random() - 0.5) * 200;
+  bgPositions[i * 3 + 2] = (Math.random() - 0.5) * 100 - 50;
+
+  const c = bgPalette[Math.floor(Math.random() * bgPalette.length)];
+  bgColors[i * 3] = c.r;
+  bgColors[i * 3 + 1] = c.g;
+  bgColors[i * 3 + 2] = c.b;
+
+  bgSizes[i] = Math.random() * 2 + 0.5;
+}
+
+const bgGeometry = new THREE.BufferGeometry();
+bgGeometry.setAttribute('position', new THREE.BufferAttribute(bgPositions, 3));
+bgGeometry.setAttribute('color', new THREE.BufferAttribute(bgColors, 3));
+bgGeometry.setAttribute('size', new THREE.BufferAttribute(bgSizes, 1));
+
+const bgMaterial = new THREE.PointsMaterial({
+  size: 0.5,
+  vertexColors: true,
+  transparent: true,
+  opacity: 0.6,
+  blending: THREE.AdditiveBlending,
+  sizeAttenuation: true,
+  depthWrite: false,
+});
+
+const bgParticles = new THREE.Points(bgGeometry, bgMaterial);
+bgParticles.position.z = -100;
+scene.add(bgParticles);
+
+${interactive ? `
+// Mouse parallax for background
+const bgMouse = new THREE.Vector2(0, 0);
+document.addEventListener('mousemove', (e) => {
+  bgMouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  bgMouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+});` : ""}
+
+// Background animation - will be called from main animate loop
+function updateBackground(elapsed) {
+  bgParticles.rotation.y = elapsed * 0.02;
+  bgParticles.rotation.x = elapsed * 0.01;
+  
+  // Gentle float
+  const pos = bgGeometry.attributes.position.array;
+  for (let i = 0; i < bgParticleCount; i++) {
+    pos[i * 3 + 1] += Math.sin(elapsed + i * 0.1) * 0.001;
+  }
+  bgGeometry.attributes.position.needsUpdate = true;
+  
+  ${interactive ? `
+  // Subtle parallax
+  bgParticles.position.x += (bgMouse.x * 2 - bgParticles.position.x) * 0.02;
+  bgParticles.position.y += (bgMouse.y * 2 - bgParticles.position.y) * 0.02;` : ""}
+}
+
+// Make update function available globally for the animation loop
+window.updateBackgroundParticles = updateBackground;`;
+}

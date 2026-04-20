@@ -6,6 +6,10 @@ import { treeModel } from "./tree.js";
 import { abstractSculptureModel } from "./abstract-sculpture.js";
 import { lowPolyAnimalModel } from "./low-poly-animal.js";
 import { architecturalModel } from "./architectural.js";
+import { productModel, ProductOptions } from "./product.js";
+import { tubeModel, torusModel, helixModel, TubeOptions } from "./tube.js";
+import { colorSchemeToTokens } from "../utils/design-tokens.js";
+import { generatePbrSceneSetup, generateAutoScale, pbrImports, generateResizeHandler } from "../utils/three-scene.js";
 
 export type ModelType =
   | "terrain"
@@ -13,18 +17,29 @@ export type ModelType =
   | "low_poly_animal"
   | "architectural"
   | "crystal"
-  | "tree";
+  | "tree"
+  | "product"
+  | "tube"
+  | "torus"
+  | "helix";
 
-export type ModelStyle = "flat" | "smooth" | "wireframe" | "toon";
+export type { ProductOptions } from "./product.js";
+export type { TubeOptions } from "./tube.js";
+
+export type ModelStyle = "flat" | "smooth" | "wireframe" | "toon" | "dna_helix" | "voxel" | "hologram" | "neon_wire" | "glitch" | "particle_cloud";
 export type ModelOutputFormat = "threejs_code" | "gltf_exporter_code" | "standalone_html";
 
-const generators: Record<ModelType, (opts: { complexity: number; style: string; colors: ColorScheme; seed: number }) => string> = {
+const generators: Record<ModelType, (opts: { complexity: number; style: string; colors: ColorScheme; seed: number; productOptions?: ProductOptions; tubeOptions?: TubeOptions }) => string> = {
   terrain: terrainModel,
   crystal: crystalModel,
   tree: treeModel,
   abstract_sculpture: abstractSculptureModel,
   low_poly_animal: lowPolyAnimalModel,
   architectural: architecturalModel,
+  product: productModel,
+  tube: tubeModel,
+  torus: torusModel,
+  helix: helixModel,
 };
 
 export function generateModel(
@@ -33,13 +48,15 @@ export function generateModel(
   colors: Partial<ColorScheme> = {},
   style: ModelStyle = "flat",
   seed: number = 42,
-  outputFormat: ModelOutputFormat = "threejs_code"
+  outputFormat: ModelOutputFormat = "threejs_code",
+  productOptions?: ProductOptions,
+  tubeOptions?: TubeOptions
 ): string {
   const scheme: ColorScheme = { ...DEFAULT_SCHEME, ...colors };
   const gen = generators[modelType];
   if (!gen) throw new Error(`Unknown model type: ${modelType}`);
 
-  const modelCode = gen({ complexity, style, colors: scheme, seed });
+  const modelCode = gen({ complexity, style, colors: scheme, seed, productOptions, tubeOptions });
 
   if (outputFormat === "threejs_code") {
     return `import * as THREE from 'three';\n\n${modelCode}`;
@@ -67,33 +84,20 @@ exporter.parse(${groupName}, (gltf) => {
 
   // standalone_html
   const groupName = getGroupName(modelType);
+  const tokens = colorSchemeToTokens(colors);
   const sceneCode = `
-import * as THREE from 'three';
+${pbrImports()}
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color("${scheme.background}");
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(8, 6, 8);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
-document.body.appendChild(renderer.domElement);
+${generatePbrSceneSetup(tokens, {
+  cameraPosition: { x: 5, y: 4, z: 6 },
+  cameraFov: 50,
+  enableShadows: true,
+  appendToBody: true,
+})}
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-
-// Lighting
-scene.add(new THREE.AmbientLight(0x404040, 0.8));
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-dirLight.position.set(5, 10, 7);
-dirLight.castShadow = true;
-scene.add(dirLight);
-const pointLight = new THREE.PointLight("${scheme.accent}", 1.5, 20);
-pointLight.position.set(-3, 5, -3);
-scene.add(pointLight);
 
 // Grid
 const grid = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
@@ -102,6 +106,7 @@ scene.add(grid);
 ${modelCode}
 
 scene.add(${groupName});
+${generateAutoScale(groupName)}
 
 function animate() {
   requestAnimationFrame(animate);
@@ -110,14 +115,11 @@ function animate() {
 }
 animate();
 
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});`;
+${generateResizeHandler()}`;
 
   return standaloneHtml({
     title: `${modelType} - 3D Model`,
+    backgroundColor: scheme.background,
     importMap: {
       ...threeImportMap(),
     },
@@ -133,6 +135,10 @@ function getGroupName(modelType: ModelType): string {
     abstract_sculpture: "sculptureGroup",
     low_poly_animal: "animalGroup",
     architectural: "archGroup",
+    product: "productGroup",
+    tube: "tubeGroup",
+    torus: "torusGroup",
+    helix: "helixGroup",
   };
   return names[modelType];
 }

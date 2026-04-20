@@ -1,5 +1,5 @@
 {
-  "name": "frontend-mcp",
+  "name": "brushstroke",
   "version": "1.0.0",
   "description": "Comprehensive MCP server for frontend tooling - shaders, backgrounds, 3D models, scroll animations, and components",
   "type": "module",
@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
+    "playwright": "^1.50.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {

@@ -1,4 +1,12 @@
-export function asciiFragment(opts: { charSize: number; edgeThreshold: number; colorMode: "mono" | "color" }): string {
+export function asciiFragment(opts: {
+  charSize: number;
+  edgeThreshold: number;
+  colorMode: "mono" | "color";
+  exposure?: number;
+  attenuation?: number;
+}): string {
+  const exposure = opts.exposure ?? 1.2;
+  const attenuation = opts.attenuation ?? 1.0;
   const colorOutput = opts.colorMode === "color"
     ? "vec3 finalColor = originalColor * charBrightness;"
     : "vec3 finalColor = vec3(charBrightness);";
@@ -30,6 +38,10 @@ void main() {
   vec3 originalColor = texColor.rgb;
   float lum = luminance(originalColor);
 
+  // Exposure and attenuation controls (AcerolaFX-style)
+  lum = pow(lum * ${exposure.toFixed(2)}, ${attenuation.toFixed(2)});
+  lum = clamp(lum, 0.0, 1.0);
+
   // Sobel edge detection
   float dx = luminance(texture2D(tDiffuse, cell + vec2(cellSize.x, 0.0)).rgb) -
              luminance(texture2D(tDiffuse, cell - vec2(cellSize.x, 0.0)).rgb);
@@ -37,23 +49,27 @@ void main() {
              luminance(texture2D(tDiffuse, cell - vec2(0.0, cellSize.y)).rgb);
   float edge = length(vec2(dx, dy));
 
-  // Character selection based on luminance
-  int n = 4096;
-  if (lum > 0.2) n = 65600;
-  if (lum > 0.3) n = 163153;
-  if (lum > 0.4) n = 15255086;
-  if (lum > 0.5) n = 13121101;
-  if (lum > 0.6) n = 15## 252014;
-  if (lum > 0.7) n = 11512810;
-  if (lum > 0.8) n = 32012382;
+  // 10 luminance levels (expanded from 8) — matching AcerolaFX bucketing
+  int n = 4096;                        // space (very dark)
+  if (lum > 0.1) n = 4329476;         // .
+  if (lum > 0.2) n = 65600;           // :
+  if (lum > 0.3) n = 163153;          // -
+  if (lum > 0.4) n = 15255086;        // =
+  if (lum > 0.5) n = 13121101;        // +
+  if (lum > 0.6) n = 15252014;        // *
+  if (lum > 0.7) n = 11512810;        // #
+  if (lum > 0.8) n = 32012382;        // @
+  if (lum > 0.9) n = 33061950;        // full block
 
-  // Edge characters override
+  // 5 edge direction characters
   if (edge > ${opts.edgeThreshold.toFixed(2)}) {
     float angle = atan(dy, dx);
-    if (abs(angle) < 0.4) n = 4329604;       // —
-    else if (abs(angle) > 1.2) n = 4541220;  // |
-    else if (angle > 0.0) n = 1131796;       // /
-    else n = 4460068;                          // \\
+    if (abs(angle) < 0.4) n = 4329604;           // horizontal —
+    else if (abs(angle) > 1.2) n = 4541220;      // vertical |
+    else if (angle > 0.0) n = 1131796;           // forward /
+    else n = 4460068;                              // backslash
+    // Cross for strong edges in both directions
+    if (abs(dx) > ${(opts.edgeThreshold * 1.5).toFixed(2)} && abs(dy) > ${(opts.edgeThreshold * 1.5).toFixed(2)}) n = 4735540; // +
   }
 
   float charBrightness = character(n, localUv);

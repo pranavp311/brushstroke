@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { generateScrollAnimation, ScrollSection, ModelSource, AnimationOutputFormat } from "../animations/scroll-templates.js";
+import { analyzeCodeOutput, feedbackContentBlock } from "../utils/tool-feedback.js";
 
 const sectionSchema = z.object({
   id: z.string(),
@@ -23,6 +24,14 @@ const sectionSchema = z.object({
       y: z.number().optional(),
       z: z.number().optional(),
     }).optional(),
+    cameraPath: z.array(z.object({
+      x: z.number(), y: z.number(), z: z.number(),
+    })).optional().describe("Camera follows a CatmullRomCurve3 spline through these points"),
+    cameraLookAt: z.union([
+      z.object({ x: z.number(), y: z.number(), z: z.number() }),
+      z.literal("model"),
+      z.literal("next"),
+    ]).optional().describe("Camera lookAt target: fixed point, 'model' (default), or 'next' (look ahead on spline)"),
     ease: z.string().optional(),
   }),
 });
@@ -34,11 +43,21 @@ const modelSourceSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("generate"),
-    modelType: z.enum(["terrain", "abstract_sculpture", "low_poly_animal", "architectural", "crystal", "tree"]),
+    modelType: z.enum(["terrain", "abstract_sculpture", "low_poly_animal", "architectural", "crystal", "tree", "product", "tube", "torus", "helix"]),
     modelOptions: z.object({
       complexity: z.number().optional(),
       style: z.string().optional(),
       seed: z.number().optional(),
+      productOptions: z.object({
+        preset: z.enum(["smartphone", "laptop", "bottle", "shoe", "watch", "headphones", "tablet", "mug"]),
+        dimensions: z.object({
+          width: z.number().optional(),
+          height: z.number().optional(),
+          depth: z.number().optional(),
+        }).optional(),
+        features: z.record(z.boolean()).optional(),
+        materialOverride: z.enum(["metallic", "matte", "glossy", "transparent"]).optional(),
+      }).optional(),
     }).optional(),
   }),
   z.object({
@@ -72,8 +91,12 @@ export function registerScrollAnimation(server: McpServer): void {
           (params.outputFormat as AnimationOutputFormat) ?? "standalone_html"
         );
 
+        const feedback = analyzeCodeOutput("generate_scroll_animation", code, params.outputFormat ?? "standalone_html");
         return {
-          content: [{ type: "text" as const, text: code }],
+          content: [
+            { type: "text" as const, text: code },
+            feedbackContentBlock(feedback),
+          ],
         };
       } catch (e) {
         return {
