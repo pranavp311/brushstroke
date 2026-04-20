@@ -9,80 +9,40 @@ Brushstroke exposes **15 tools**, **11 browsable resources**, and **3 workflow p
 ## Architecture
 
 ```mermaid
-flowchart TB
-    Client["MCP Client<br/>(stdio)"]
+flowchart TD
+    Client(["MCP Client"])
+
+    Client <==>|stdio| API
 
     subgraph Server["Brushstroke MCP Server"]
         direction TB
-
-        subgraph Tools["15 Tools"]
-            direction LR
-            subgraph Codegen["Code Generation"]
-                T1["generate_page<br/>(orchestrator)"]
-                T2["generate_shader"]
-                T3["generate_shader_stack"]
-                T4["generate_background"]
-                T5["generate_3d_model"]
-                T6["generate_scene"]
-                T7["generate_scroll_animation"]
-                T8["generate_component"]
-                T9["generate_ascii_art"]
-                T10["generate_simple_composite"]
-            end
-            subgraph Validation["Validation & Iteration"]
-                T11["evaluate_design (VLM)"]
-                T12["validate_animation"]
-                T13["quick_validate"]
-                T14["capture_page_screenshots"]
-                T15["iterate_page"]
-            end
-        end
-
-        subgraph Libraries["Generator Libraries"]
-            direction LR
-            L1["shaders/<br/>ASCII · CRT · bloom<br/>halftone · kuwahara<br/>chromatic · dithering<br/>film-grain · hologram<br/>edge-detect · pixel-sort"]
-            L2["backgrounds/<br/>aurora · starfield<br/>particles · wave<br/>noise-terrain · matrix<br/>gradient-mesh<br/>floating-geometry<br/>fluid-sim"]
-            L3["models/<br/>crystal · terrain<br/>architectural · tree<br/>abstract-sculpture<br/>low-poly-animal<br/>product · tube"]
-            L4["animations/<br/>easings · physics<br/>camera-movements<br/>model-animations<br/>scroll-templates<br/>render-modes"]
-            L5["composition/<br/>page-engine<br/>section-templates<br/>scroll-controller"]
-        end
-
-        subgraph Utils["Shared Runtime"]
-            direction LR
-            U1["html-template<br/>design-tokens"]
-            U2["page-preview<br/>(Playwright)"]
-            U3["design-evaluation<br/>(VLM client)"]
-            U4["param-patcher<br/>tool-feedback"]
-        end
-
-        Resources["Resources<br/>11 docs (guides, refs, gallery)"]
-        Prompts["Prompts<br/>3 workflows"]
-
-        FB(("__BRUSHSTROKE_FEEDBACK__<br/>structured JSON<br/>quality · warnings · fixes"))
+        API["<b>Interface</b><br/>15 Tools · 11 Resources · 3 Prompts"]
+        Gen["<b>Generator Libraries</b><br/>shaders · backgrounds · models<br/>animations · composition · components"]
+        Util["<b>Runtime</b><br/>html-template · page-preview<br/>param-patcher · vlm-client"]
+        API --> Gen
+        API --> Util
     end
 
-    Output["Generated Artifact<br/>HTML · GLSL · Three.js JS"]
+    Gen --> Output["<b>Generated Artifact</b><br/>HTML · GLSL · Three.js"]
+    Util --> Output
+    Output --> Render["Playwright Render<br/>+ Screenshot"]
+    Render --> Eval["Quality Scoring<br/>VLM or heuristic"]
+    Eval --> FB[("<b>__BRUSHSTROKE_FEEDBACK__</b><br/>quality · warnings · suggestions")]
 
-    Client <-->|"tool calls"| Tools
-    Client <-->|"resource reads"| Resources
-    Client <-->|"prompt reads"| Prompts
+    FB -.->|"iterate_page applies<br/>suggestions[] by paramPath"| API
 
-    Tools --> Libraries
-    Tools --> Utils
-    Libraries --> Output
-    Utils --> Output
+    classDef client fill:#0ea5e9,stroke:#0369a1,color:#f0f9ff,stroke-width:2px
+    classDef api fill:#1e40af,stroke:#3b82f6,color:#eff6ff,stroke-width:1.5px
+    classDef core fill:#1e293b,stroke:#64748b,color:#f1f5f9,stroke-width:1px
+    classDef output fill:#0f766e,stroke:#2dd4bf,color:#ccfbf1,stroke-width:1.5px
+    classDef step fill:#334155,stroke:#94a3b8,color:#f8fafc,stroke-width:1px
+    classDef feedback fill:#9a3412,stroke:#fb923c,color:#ffedd5,stroke-width:2px
 
-    Output -.->|"render · screenshot · score"| FB
-    FB -.->|"suggestions[]"| T15
-    T15 -.->|"auto-apply fixes"| T1
-
-    classDef tool fill:#1e293b,stroke:#64748b,color:#f1f5f9
-    classDef lib fill:#0f172a,stroke:#475569,color:#e2e8f0
-    classDef util fill:#111827,stroke:#4b5563,color:#e5e7eb
-    classDef feedback fill:#7c2d12,stroke:#fb923c,color:#ffedd5
-    class T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15 tool
-    class L1,L2,L3,L4,L5 lib
-    class U1,U2,U3,U4 util
+    class Client client
+    class API api
+    class Gen,Util core
+    class Output output
+    class Render,Eval step
     class FB feedback
 ```
 
